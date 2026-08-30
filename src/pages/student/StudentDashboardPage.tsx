@@ -58,7 +58,7 @@ export function StudentDashboardPage() {
     <div className="space-y-6">
       {/* State A: Loading */}
       {loading && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center shadow-sm">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
           <p className="mt-4 text-sm font-medium text-slate-600">Loading your academic dashboard...</p>
         </div>
@@ -66,7 +66,7 @@ export function StudentDashboardPage() {
 
       {/* State B: Unauthorized / Missing Student Record */}
       {!loading && error === 'STUDENT_NOT_FOUND' && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 shadow-sm">
           <div className="flex items-start gap-4">
             <div className="rounded-full bg-amber-100 p-2 text-amber-800">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -91,7 +91,7 @@ export function StudentDashboardPage() {
 
       {/* State C: Unauthenticated */}
       {!loading && error === 'UNAUTHENTICATED' && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm">
           <h3 className="text-base font-semibold text-red-900">Authentication Required</h3>
           <p className="mt-1 text-sm text-red-700">Please log in to access your dashboard.</p>
         </div>
@@ -99,7 +99,7 @@ export function StudentDashboardPage() {
 
       {/* State D: Database / Fetch Error */}
       {!loading && error === 'FETCH_ERROR' && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h3 className="text-base font-semibold text-red-900">Unable to load dashboard</h3>
@@ -122,7 +122,7 @@ export function StudentDashboardPage() {
       {!loading && !error && dashboardData && (
         <>
           {/* Welcome & Profile Summary Banner */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -162,8 +162,8 @@ export function StudentDashboardPage() {
           </section>
 
           {/* Academic Overview Statistics Cards */}
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Courses Recorded
               </p>
@@ -173,7 +173,7 @@ export function StudentDashboardPage() {
               <p className="mt-1 text-xs text-slate-500">Total published results</p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Credit Units
               </p>
@@ -183,7 +183,17 @@ export function StudentDashboardPage() {
               <p className="mt-1 text-xs text-slate-500">Earned course units</p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                CGPA
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {dashboardData.stats.cgpa === null ? '—' : dashboardData.stats.cgpa.toFixed(2)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Cumulative performance</p>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Academic Session
               </p>
@@ -193,7 +203,7 @@ export function StudentDashboardPage() {
               <p className="mt-1 text-xs text-slate-500">Latest recorded session</p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                 Current Semester
               </p>
@@ -205,7 +215,7 @@ export function StudentDashboardPage() {
           </section>
 
           {/* Recent Results Preview */}
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <section className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Recent Course Results</h3>
@@ -296,7 +306,7 @@ export function StudentDashboardPage() {
           <section className="grid gap-4 md:grid-cols-3">
             <Link
               to="/student/results"
-              className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+              className="group rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
             >
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -314,7 +324,7 @@ export function StudentDashboardPage() {
 
             <Link
               to="/student/transcript"
-              className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+              className="group rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
             >
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -332,7 +342,7 @@ export function StudentDashboardPage() {
 
             <Link
               to="/student/profile"
-              className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+              className="group rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
             >
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">

@@ -6,11 +6,11 @@ import {
   getValidAcademicResults,
 } from '../../services/academicCalculations';
 import {
-  fetchStudentTranscriptData,
-  type FetchTranscriptError,
-  type StudentTranscriptProfile,
-} from '../../services/supabase/studentTranscript';
-import type { StudentResultItem } from '../../types';
+  fetchAdminStudents,
+  fetchStudentTranscriptForAdmin,
+  type AdminStudentItem,
+} from '../../services/supabase/admin';
+import type { StudentRecord, StudentResultItem } from '../../types';
 
 type SemesterGroup = {
   semesterName: string;
@@ -26,57 +26,59 @@ type SessionGroup = {
   semesters: SemesterGroup[];
 };
 
-export function StudentTranscriptPage() {
+export function AdminTranscriptsPage() {
+  const [students, setStudents] = useState<AdminStudentItem[] | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [targetStudent, setTargetStudent] = useState<StudentRecord | null>(null);
   const [results, setResults] = useState<StudentResultItem[] | null>(null);
-  const [student, setStudent] = useState<StudentTranscriptProfile | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<FetchTranscriptError | null>(null);
 
-  const loadData = useCallback(async () => {
-    const response = await fetchStudentTranscriptData();
-    if (response.error) {
-      setError(response.error);
-      setStudent(response.student);
-      setResults(null);
-    } else {
-      setError(null);
-      setStudent(response.student);
-      setResults(response.data);
-    }
-    setLoading(false);
-  }, []);
+  const [loadingStudents, setLoadingStudents] = useState<boolean>(true);
+  const [loadingTranscript, setLoadingTranscript] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleRetry = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    void loadData();
-  }, [loadData]);
-
+  // Fetch student directory first
   useEffect(() => {
     let isMounted = true;
-
-    const initialize = async () => {
-      const response = await fetchStudentTranscriptData();
+    const init = async () => {
+      const res = await fetchAdminStudents();
       if (!isMounted) return;
-
-      if (response.error) {
-        setError(response.error);
-        setStudent(response.student);
-        setResults(null);
-      } else {
-        setError(null);
-        setStudent(response.student);
-        setResults(response.data);
+      if (res.error) {
+        setError(res.error);
+      } else if (res.data && res.data.length > 0) {
+        setStudents(res.data);
+        setSelectedStudentId(res.data[0].student_id);
       }
-      setLoading(false);
+      setLoadingStudents(false);
     };
-
-    void initialize();
-
+    void init();
     return () => {
       isMounted = false;
     };
   }, []);
+
+  // Fetch transcript when selected student changes
+  const loadTranscript = useCallback(async (sId: string) => {
+    if (!sId) return;
+    setLoadingTranscript(true);
+    setError(null);
+
+    const res = await fetchStudentTranscriptForAdmin(sId);
+    if (res.error) {
+      setError(res.error);
+      setTargetStudent(null);
+      setResults(null);
+    } else {
+      setTargetStudent(res.student);
+      setResults(res.results);
+    }
+    setLoadingTranscript(false);
+  }, []);
+
+  useEffect(() => {
+    if (selectedStudentId) {
+      void loadTranscript(selectedStudentId);
+    }
+  }, [selectedStudentId, loadTranscript]);
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -117,7 +119,6 @@ export function StudentTranscriptPage() {
       const sortedSemesters = Array.from(semestersMap.values())
         .sort((a, b) => a.semesterOrder - b.semesterOrder)
         .map((semGroup) => {
-          // Sort courses alphabetically by course_code within semester
           const sortedResults = [...semGroup.results].sort((a, b) =>
             a.course_code.localeCompare(b.course_code),
           );
@@ -188,105 +189,80 @@ export function StudentTranscriptPage() {
 
   return (
     <div className="space-y-6 print:space-y-4 print:p-0">
-      {/* Top Action Bar (Hidden during print) */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm print:hidden">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Academic record preview
-          </p>
-          <h2 className="mt-1 text-2xl font-bold text-slate-900">Academic Transcript</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            View or print your complete, multi-session academic performance record.
-          </p>
-        </div>
+      {/* Top Selector & Action Bar (Hidden during print) */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm print:hidden space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Admin Transcript Verification
+            </p>
+            <h2 className="mt-1 text-2xl font-bold text-slate-900">Student Transcript Preview</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Select any student to verify or print their complete academic transcript.
+            </p>
+          </div>
 
-        {!loading && !error && student && results && results.length > 0 && (
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-              />
-            </svg>
-            Print / Save as PDF
-          </button>
-        )}
-      </div>
-
-      {/* State A: Loading */}
-      {loading && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
-          <p className="mt-4 text-sm font-medium text-slate-600">
-            Generating academic transcript preview...
-          </p>
-        </div>
-      )}
-
-      {/* State B: Unauthorized / Missing Student Record */}
-      {!loading && error === 'STUDENT_NOT_FOUND' && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="rounded-full bg-amber-100 p-2 text-amber-800">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          {!loadingTranscript && targetStudent && (
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth="2"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
                 />
               </svg>
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-amber-900">Student Profile Not Found</h3>
-              <p className="mt-1 text-sm text-amber-800">
-                Your authenticated account is not currently linked to an active student profile.
-                Please contact your institution&apos;s administrator to link your profile before viewing your transcript.
-              </p>
-            </div>
-          </div>
+              Print Transcript
+            </button>
+          )}
         </div>
-      )}
 
-      {/* State C: Unauthenticated */}
-      {!loading && error === 'UNAUTHENTICATED' && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
-          <h3 className="text-base font-semibold text-red-900">Authentication Required</h3>
-          <p className="mt-1 text-sm text-red-700">
-            Please log in to view your academic transcript.
+        {/* Student Dropdown Selector */}
+        {!loadingStudents && students && students.length > 0 && (
+          <div className="max-w-md pt-2">
+            <label htmlFor="selectAdminTranscriptStudent" className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Select Student Record
+            </label>
+            <select
+              id="selectAdminTranscriptStudent"
+              value={selectedStudentId}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-slate-900 focus:outline-none"
+            >
+              {students.map((s) => (
+                <option key={s.student_id} value={s.student_id}>
+                  {s.full_name} — {s.matric_number} ({s.department ?? 'Dept'})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Loading State */}
+      {(loadingStudents || loadingTranscript) && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
+          <p className="mt-4 text-sm font-medium text-slate-600">
+            Fetching student transcript record...
           </p>
         </div>
       )}
 
-      {/* State D: Database / Fetch Error */}
-      {!loading && error === 'FETCH_ERROR' && (
+      {/* Error State */}
+      {!loadingStudents && !loadingTranscript && error && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h3 className="text-base font-semibold text-red-900">Unable to load transcript</h3>
-              <p className="mt-1 text-sm text-red-700">
-                We encountered an issue fetching your transcript from the database. Please try again.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleRetry}
-              className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 focus:outline-none"
-            >
-              Retry
-            </button>
-          </div>
+          <h3 className="text-base font-semibold text-red-900">Unable to load transcript</h3>
+          <p className="mt-1 text-sm text-red-700">{error}</p>
         </div>
       )}
 
-      {/* State E & F: Transcript Document View */}
-      {!loading && !error && student && (
+      {/* Transcript Document View */}
+      {!loadingStudents && !loadingTranscript && !error && targetStudent && (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-10 shadow-sm print:border-none print:shadow-none print:p-0 print:m-0">
           {/* Institutional Document Header */}
           <div className="border-b-2 border-slate-900 pb-6 text-center">
@@ -310,42 +286,42 @@ export function StudentTranscriptPage() {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Student Name:
                 </span>
-                <p className="font-bold text-slate-900">{student.fullName}</p>
+                <p className="font-bold text-slate-900">{targetStudent.full_name}</p>
               </div>
 
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Matriculation Number:
                 </span>
-                <p className="font-mono font-bold text-slate-900">{student.matricNumber}</p>
+                <p className="font-mono font-bold text-slate-900">{targetStudent.matric_number}</p>
               </div>
 
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Department / Programme:
                 </span>
-                <p className="font-medium text-slate-800">{student.department ?? 'N/A'}</p>
+                <p className="font-medium text-slate-800">{targetStudent.department ?? 'N/A'}</p>
               </div>
 
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Level of Enrollment:
                 </span>
-                <p className="font-medium text-slate-800">{student.levelOfEnrollment}</p>
+                <p className="font-medium text-slate-800">{targetStudent.level_of_enrollment}</p>
               </div>
 
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Student Email:
                 </span>
-                <p className="font-medium text-slate-800">{student.email ?? 'N/A'}</p>
+                <p className="font-medium text-slate-800">{targetStudent.email ?? 'N/A'}</p>
               </div>
 
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Academic Status:
                 </span>
-                <p className="font-medium text-slate-800 capitalize">{student.status}</p>
+                <p className="font-medium text-slate-800 capitalize">{targetStudent.status}</p>
               </div>
             </div>
           </div>
@@ -355,7 +331,7 @@ export function StudentTranscriptPage() {
             <div className="mt-8 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
               <p className="text-base font-semibold text-slate-800">No Academic Results Found</p>
               <p className="mt-1 text-sm text-slate-600">
-                There are currently no published course results recorded for your account. Published semester grades will appear here automatically.
+                There are currently no published course results recorded for this student account.
               </p>
             </div>
           )}

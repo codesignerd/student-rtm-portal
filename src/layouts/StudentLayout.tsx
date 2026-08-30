@@ -18,9 +18,9 @@ export function StudentLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="mx-auto flex max-w-7xl gap-6 p-6">
-        <aside className="w-full max-w-xs rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="min-h-screen bg-slate-100 text-slate-900 print:bg-white print:min-h-0">
+      <div className="mx-auto flex max-w-8xl print:block print:max-w-none">
+        <aside className="w-full max-w-xs border-r border-r-slate-200 bg-white p-5 shadow-sm print:hidden">
           <div className="border-b border-slate-200 pb-4">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               Student portal
@@ -57,8 +57,8 @@ export function StudentLayout() {
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1">
-          <header className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <div className="min-w-0 flex-1 p-6 print:p-0 print:m-0">
+          <header className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm print:hidden">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -77,7 +77,7 @@ export function StudentLayout() {
             </div>
           </header>
 
-          <main className="mt-6">
+          <main className="mt-6 print:mt-0">
             <Outlet />
           </main>
         </div>

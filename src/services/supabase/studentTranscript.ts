@@ -1,41 +1,26 @@
-import { calculateCgpa } from '../academicCalculations';
 import { supabase } from './client';
-import type { StudentResultItem, StudentRecord } from '../../types';
+import type { StudentResultItem } from '../../types';
 
-export type FetchDashboardError =
+export type FetchTranscriptError =
   | 'UNAUTHENTICATED'
   | 'STUDENT_NOT_FOUND'
   | 'FETCH_ERROR';
 
-export type DashboardStudentProfile = Pick<
-  StudentRecord,
-  | 'student_id'
-  | 'full_name'
-  | 'matric_number'
-  | 'department'
-  | 'level_of_enrollment'
-  | 'status'
-  | 'email'
-  | 'phone'
->;
-
-export type StudentDashboardStats = {
-  totalCourses: number;
-  totalCreditUnits: number;
-  latestSession: string | null;
-  latestSemester: string | null;
-  cgpa: number | null;
+export type StudentTranscriptProfile = {
+  studentId: string;
+  fullName: string;
+  matricNumber: string;
+  department: string | null;
+  levelOfEnrollment: string;
+  status: string;
+  email: string | null;
+  phone: string | null;
 };
 
-export type StudentDashboardData = {
-  student: DashboardStudentProfile;
-  stats: StudentDashboardStats;
-  recentResults: StudentResultItem[];
-};
-
-export type FetchDashboardResponse = {
-  data: StudentDashboardData | null;
-  error: FetchDashboardError | null;
+export type FetchTranscriptResponse = {
+  data: StudentResultItem[] | null;
+  student: StudentTranscriptProfile | null;
+  error: FetchTranscriptError | null;
   errorMessage?: string;
 };
 
@@ -45,7 +30,6 @@ type RawResultRow = {
   grade: string;
   grade_point: number;
   remark: string | null;
-  created_at: string;
   courses: {
     course_code: string;
     course_title: string;
@@ -76,7 +60,7 @@ type RawResultRow = {
   }[] | null;
 };
 
-export async function fetchStudentDashboardData(): Promise<FetchDashboardResponse> {
+export async function fetchStudentTranscriptData(): Promise<FetchTranscriptResponse> {
   try {
     // 1. Get authenticated Supabase user
     const { data: userData, error: authError } = await supabase.auth.getUser();
@@ -84,6 +68,7 @@ export async function fetchStudentDashboardData(): Promise<FetchDashboardRespons
     if (authError || !userData.user) {
       return {
         data: null,
+        student: null,
         error: 'UNAUTHENTICATED',
         errorMessage: authError?.message || 'No active authenticated session found.',
       };
@@ -97,9 +82,10 @@ export async function fetchStudentDashboardData(): Promise<FetchDashboardRespons
       .maybeSingle();
 
     if (studentError) {
-      console.error('Failed to resolve student record for dashboard:', studentError.message);
+      console.error('Failed to resolve student record for transcript:', studentError.message);
       return {
         data: null,
+        student: null,
         error: 'FETCH_ERROR',
         errorMessage: studentError.message,
       };
@@ -108,12 +94,24 @@ export async function fetchStudentDashboardData(): Promise<FetchDashboardRespons
     if (!student) {
       return {
         data: null,
+        student: null,
         error: 'STUDENT_NOT_FOUND',
         errorMessage: 'Your user account is not linked to an active student profile.',
       };
     }
 
-    // 3. Query results for statistics and recent results preview
+    const studentProfile: StudentTranscriptProfile = {
+      studentId: student.student_id,
+      fullName: student.full_name,
+      matricNumber: student.matric_number,
+      department: student.department ?? null,
+      levelOfEnrollment: student.level_of_enrollment,
+      status: student.status,
+      email: student.email ?? userData.user.email ?? null,
+      phone: student.phone ?? null,
+    };
+
+    // 3. Query results for this student with course, semester, and academic session details
     const { data: rawResults, error: resultsError } = await supabase
       .from('results')
       .select(`
@@ -122,7 +120,6 @@ export async function fetchStudentDashboardData(): Promise<FetchDashboardRespons
         grade,
         grade_point,
         remark,
-        created_at,
         courses (
           course_code,
           course_title,
@@ -137,21 +134,28 @@ export async function fetchStudentDashboardData(): Promise<FetchDashboardRespons
           )
         )
       `)
-      .eq('student_id', student.student_id)
-      .order('created_at', { ascending: false });
+      .eq('student_id', student.student_id);
 
     if (resultsError) {
-      console.error('Failed to fetch dashboard results from Supabase:', resultsError.message);
+      console.error('Failed to fetch transcript results from Supabase:', resultsError.message);
       return {
         data: null,
+        student: studentProfile,
         error: 'FETCH_ERROR',
         errorMessage: resultsError.message,
       };
     }
 
-    const rows = (rawResults as unknown as RawResultRow[]) || [];
+    if (!rawResults || rawResults.length === 0) {
+      return {
+        data: [],
+        student: studentProfile,
+        error: null,
+      };
+    }
 
-    const mappedResults: StudentResultItem[] = rows.map((row) => {
+    // 4. Flatten and map the relational rows
+    const items: StudentResultItem[] = (rawResults as unknown as RawResultRow[]).map((row) => {
       const courseObj = Array.isArray(row.courses) ? row.courses[0] : row.courses;
       const semesterObj = Array.isArray(row.semesters) ? row.semesters[0] : row.semesters;
       const sessionObj = semesterObj
@@ -176,41 +180,17 @@ export async function fetchStudentDashboardData(): Promise<FetchDashboardRespons
       };
     });
 
-    const totalCourses = mappedResults.length;
-    const totalCreditUnits = mappedResults.reduce((sum, item) => sum + item.credit_unit, 0);
-    const latestSession = mappedResults.length > 0 ? mappedResults[0].session_name : null;
-    const latestSemester = mappedResults.length > 0 ? mappedResults[0].semester_name : null;
-    const cgpa = calculateCgpa(mappedResults);
-    const recentResults = mappedResults.slice(0, 5);
-
     return {
-      data: {
-        student: {
-          student_id: student.student_id,
-          full_name: student.full_name,
-          matric_number: student.matric_number,
-          department: student.department ?? null,
-          level_of_enrollment: student.level_of_enrollment,
-          status: student.status,
-          email: student.email ?? null,
-          phone: student.phone ?? null,
-        },
-        stats: {
-          totalCourses,
-          totalCreditUnits,
-          latestSession,
-          latestSemester,
-          cgpa,
-        },
-        recentResults,
-      },
+      data: items,
+      student: studentProfile,
       error: null,
     };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred.';
-    console.error('Unexpected error in fetchStudentDashboardData:', errorMsg);
+    console.error('Unexpected error in fetchStudentTranscriptData:', errorMsg);
     return {
       data: null,
+      student: null,
       error: 'FETCH_ERROR',
       errorMessage: errorMsg,
     };

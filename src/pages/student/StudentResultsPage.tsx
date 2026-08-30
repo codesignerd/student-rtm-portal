@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { calculateSemesterGpa } from '../../services/academicCalculations';
 import {
   fetchStudentResults,
   type FetchStudentResultsError,
@@ -7,13 +8,16 @@ import {
 } from '../../services/supabase/studentResults';
 import type { StudentResultItem } from '../../types';
 
+type SemesterResultGroup = {
+  semesterName: string;
+  semesterOrder: number;
+  results: StudentResultItem[];
+  semesterGpa: number | null;
+};
+
 type GroupedResults = {
   sessionName: string;
-  semesters: {
-    semesterName: string;
-    semesterOrder: number;
-    results: StudentResultItem[];
-  }[];
+  semesters: SemesterResultGroup[];
 };
 
 export function StudentResultsPage() {
@@ -72,10 +76,7 @@ export function StudentResultsPage() {
   const groupedResults = useMemo<GroupedResults[]>(() => {
     if (!results || results.length === 0) return [];
 
-    const sessionMap = new Map<
-      string,
-      Map<string, { semesterName: string; semesterOrder: number; results: StudentResultItem[] }>
-    >();
+    const sessionMap = new Map<string, Map<string, SemesterResultGroup>>();
 
     for (const item of results) {
       const sessionKey = item.session_name;
@@ -91,6 +92,7 @@ export function StudentResultsPage() {
           semesterName: item.semester_name,
           semesterOrder: item.semester_order,
           results: [],
+          semesterGpa: null,
         });
       }
 
@@ -102,6 +104,11 @@ export function StudentResultsPage() {
       const sortedSemesters = Array.from(semestersMap.values()).sort(
         (a, b) => a.semesterOrder - b.semesterOrder,
       );
+
+      sortedSemesters.forEach((semester) => {
+        semester.semesterGpa = calculateSemesterGpa(semester.results);
+      });
+
       grouped.push({
         sessionName,
         semesters: sortedSemesters,
@@ -241,9 +248,14 @@ export function StudentResultsPage() {
                   className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm"
                 >
                   <div className="border-b border-slate-200 bg-slate-50 px-6 py-3">
-                    <p className="text-sm font-semibold text-slate-800">
-                      {semesterGroup.semesterName}
-                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {semesterGroup.semesterName}
+                      </p>
+                      <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-100">
+                        GPA: {semesterGroup.semesterGpa === null ? 'Unavailable' : semesterGroup.semesterGpa.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="overflow-x-auto">
